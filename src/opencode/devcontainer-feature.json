@@ -1,0 +1,30 @@
+{
+  "id": "opencode",
+  "name": "OpenCode with persistent data",
+  "version": "0.1.0",
+  "options": {
+    "opencodeVersion": {
+      "type": "string",
+      "default": "latest",
+      "description": "OpenCode release version without the leading v."
+    }
+  },
+  "mounts": [
+    {
+      "source": "opencode-${devcontainerId}",
+      "target": "/var/lib/opencode",
+      "type": "volume"
+    }
+  ],
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "npmVersion": "latest",
+      "pnpmVersion": "none",
+      "nvmVersion": "none"
+    }
+  },
+  "postCreateCommand": [
+    "/usr/local/bin/opencode-check-data"
+  ]
+}
