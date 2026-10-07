@@ -70,3 +70,30 @@ if [ "$installed_version" != "$requested_version" ]; then
         "$requested_version" "$installed_version" >&2
     exit 1
 fi
+
+if ! paths_output="$(opencode debug paths)"; then
+    printf '%s\n' \
+        'Error: unable to obtain OpenCode paths.' >&2
+    exit 1
+fi
+
+opencode_tmp="$(
+    printf '%s\n' "$paths_output" |
+        sed -n 's/^tmp[[:space:]]*//p'
+)"
+
+if [ -L "$opencode_tmp" ] || {
+    [ -e "$opencode_tmp" ] && [ ! -d "$opencode_tmp" ]
+}; then
+    printf 'Error: OpenCode temporary path is not a directory: %s\n' \
+        "$opencode_tmp" >&2
+    exit 1
+fi
+
+mkdir -p -- "$opencode_tmp"
+
+chown -R -- \
+    "$remote_user:$remote_group" \
+    "$opencode_tmp"
+
+chmod 0700 -- "$opencode_tmp"

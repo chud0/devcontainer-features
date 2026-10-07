@@ -63,3 +63,37 @@ fi
 
 printf 'OpenCode data check passed: user=%s, path=%s\n' \
     "$(id -un)" "$data_link"
+
+if ! paths_output="$(opencode debug paths)"; then
+    printf '%s\n' \
+        'Error: unable to obtain OpenCode paths.' >&2
+    exit 1
+fi
+
+opencode_tmp="$(
+    printf '%s\n' "$paths_output" |
+        sed -n 's/^tmp[[:space:]]*//p'
+)"
+
+if [ -z "$opencode_tmp" ]; then
+    printf '%s\n' \
+        'Error: OpenCode did not report its temporary directory.' >&2
+    exit 1
+fi
+
+if ! tmp_test_file="$(
+    mktemp -- "$opencode_tmp/.write-test.XXXXXX"
+)"; then
+    printf 'Error: OpenCode temporary directory is not writable: %s\n' \
+        "$opencode_tmp" >&2
+    exit 1
+fi
+
+if ! rm -- "$tmp_test_file"; then
+    printf 'Error: cannot remove OpenCode temporary test file %s\n' \
+        "$tmp_test_file" >&2
+    exit 1
+fi
+
+printf 'OpenCode temporary directory check passed: user=%s, path=%s\n' \
+    "$(id -un)" "$opencode_tmp"
