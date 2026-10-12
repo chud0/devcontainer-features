@@ -39,7 +39,7 @@ To install the latest available OpenCode release:
 ```json
 {
   "features": {
-    "ghcr.io/chud0/devcontainer-features/opencode:0.1.0": {}
+    "ghcr.io/chud0/devcontainer-features/opencode": {}
   }
 }
 ```
