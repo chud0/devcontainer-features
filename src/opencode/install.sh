@@ -11,6 +11,32 @@ remote_group="$(id -gn "$remote_user")"
 data_root="/var/lib/opencode"
 data_link="$remote_home/.local/share/opencode"
 
+nvm_dir="${NVM_DIR:-/usr/local/share/nvm}"
+
+if [ ! -r "$nvm_dir/nvm.sh" ]; then
+    printf 'Error: cannot find nvm initialization script at %s/nvm.sh.\n' \
+        "$nvm_dir" >&2
+    exit 1
+fi
+
+run_as_remote_user() {
+    runuser -u "$remote_user" -- \
+        env \
+            HOME="$remote_home" \
+            NVM_DIR="$nvm_dir" \
+        bash -c '
+            set -e
+            set -o pipefail
+
+            umask 0002
+
+            . "$NVM_DIR/nvm.sh"
+            nvm use default >/dev/null
+
+            "$@"
+        ' bash "$@"
+}
+
 install -D -o root -g root -m 0755 \
     ./check-data.sh \
     /usr/local/bin/opencode-check-data
@@ -45,7 +71,9 @@ fi
 
 if [ "$requested_version" = "latest" ]; then
     echo "Requested 'latest' OpenCode version. Resolve latest version"
-    if ! requested_version="$(npm view opencode-ai@latest version)"; then
+if ! requested_version="$(
+    run_as_remote_user npm view opencode-ai@latest version
+)"; then
         printf '%s\n' \
             'Error: Unable to determine OpenCode version in npm' >&2
         exit 1
@@ -59,11 +87,18 @@ if [ "$requested_version" = "latest" ]; then
     echo "Latest OpenCode version: ${requested_version}"
 fi
 
-echo "Installing opencode, version: ${requested_version}."
-npm install --global --allow-scripts=opencode-ai "opencode-ai@${requested_version}"
+printf 'Installing OpenCode version %s as user %s.\n' \
+    "$requested_version" "$remote_user"
 
-installed_version="$(opencode --version)"
-echo "Opencode installed, version: ${installed_version}."
+run_as_remote_user \
+    npm install \
+        --global \
+        --allow-scripts=opencode-ai \
+        "opencode-ai@${requested_version}"
+
+installed_version="$(
+    run_as_remote_user opencode --version
+)"
 
 if [ "$installed_version" != "$requested_version" ]; then
     printf 'Error: requested version: %s, but installed version: %s.\n' \
@@ -71,29 +106,5 @@ if [ "$installed_version" != "$requested_version" ]; then
     exit 1
 fi
 
-if ! paths_output="$(opencode debug paths)"; then
-    printf '%s\n' \
-        'Error: unable to obtain OpenCode paths.' >&2
-    exit 1
-fi
-
-opencode_tmp="$(
-    printf '%s\n' "$paths_output" |
-        sed -n 's/^tmp[[:space:]]*//p'
-)"
-
-if [ -L "$opencode_tmp" ] || {
-    [ -e "$opencode_tmp" ] && [ ! -d "$opencode_tmp" ]
-}; then
-    printf 'Error: OpenCode temporary path is not a directory: %s\n' \
-        "$opencode_tmp" >&2
-    exit 1
-fi
-
-mkdir -p -- "$opencode_tmp"
-
-chown -R -- \
-    "$remote_user:$remote_group" \
-    "$opencode_tmp"
-
-chmod 0700 -- "$opencode_tmp"
+printf 'OpenCode installed successfully: version=%s, user=%s.\n' \
+    "$installed_version" "$remote_user"
